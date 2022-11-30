@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet
 
 # @return: Secret key
 def get_key(name: str, filename: str):
-    if os.path.exists(filename) and os.stat(filename).st_size != 0:
+    if os.path.exists(filename) and os.stat(filename).st_size != 0 and name.upper() != "X":
         is_found = False
         key = ""
         with open(filename, "r+") as f:
@@ -24,7 +24,7 @@ def get_key(name: str, filename: str):
                 if line_split[0].lstrip().rstrip() == name:
                     is_found = True
                     key = line_split[1].rstrip().lstrip()
-                    break
+                    return key
 
             # If there is no key a new key gets generated with the given name
             if not is_found:
@@ -37,7 +37,7 @@ def get_key(name: str, filename: str):
             key = Fernet.generate_key()
             f.write(f"{name} : " + key.decode() + "\n")
 
-    return key
+    return key.decode()
 
 
 # @return: Encrypted password
@@ -53,7 +53,7 @@ def decrypt(encrypted_text: str, key: str):
     fernet = Fernet(key)
     message_decrypted = fernet.decrypt(encrypted_text)
 
-    return f"\nPassword decrypted\n{message_decrypted.decode()}\n"
+    return f"\nPassword decrypted:\n{message_decrypted.decode()}\n"
 
 
 # @return: Returns a randomly generated password with desired length
@@ -78,21 +78,25 @@ def remove_key(filename: str):
     key_name = input("What is the name of the key?\n")
 
     is_found = False
-    with open(filename, "r+") as f:
-        lines = f.readlines()
+    if key_name not in ["X","x"]:
+        with open(filename, "r+") as f:
+            lines = f.readlines()
 
-        for line in lines:
-            line_split = line.split(":")
-            if key_name in line_split[0]:
-                is_found = True
-                lines.remove(line)
-                break
-        with open(filename, "w") as f:
             for line in lines:
-                f.write(line)
+                line_split = line.split(":")
+                if key_name in line_split[0]:
+                    is_found = True
+                    print("Key was successfully removed!")
+                    lines.remove(line)
+                    break
+            with open(filename, "w") as f:
+                for line in lines:
+                    f.write(line)
 
-        if not is_found:
-            print("This key doesn't exist!")
+            if not is_found:
+                print("This key doesn't exist!")
+    else:
+        print("Stopped removing..")
 
 
 # Prints the menu of options for the user to choose from.
@@ -101,15 +105,15 @@ def menu():
     user_input = ""
     options = ["G", "S", "X", "N", "E", "D", "F", "R"]
     while user_input not in options:
-        print("==========( MENU )==========")
-        print("F) File to look at")
+        print("\n==========( MENU )==========")
+        print("F) Select file")
         print("S) Show available keys")
-        print("G) Get or create key")
+        print("G) Get key or create new one")
         print("R) Remove key")
         print("E) Encrypt password with key")
         print("D) Decrypt password with key")
         print("X) Exit")
-        print("============================")
+        print("============================\n")
         user_input = input("What do you want to do?\n").upper()
 
     return user_input
@@ -117,15 +121,15 @@ def menu():
 
 # Prints all the keys found in the given key file
 def print_keys(filename: str):
-    print("==========( OPTIONS ) ==========")
     if os.path.exists(filename) and os.stat(filename).st_size != 0:
         with open(filename, "r") as f:
             lines = f.readlines()
-
+            print("\n==========(KEYS)==========")
             for line in lines:
-                if line != "":
+                if line != "" and line.find("=(KEYS)=") == -1 :
                     line_split = line.split(":")
                     print(line_split[0].lstrip().rstrip())
+            print("==========================")
 
     else:
         print("No options available!")
@@ -161,7 +165,7 @@ def main():
         elif user_input == "G":  # Print key with given name
             print("If you want a new key, just enter a new name!")
             key_name = input("\nWhat is the key name?\n")
-            print("\n" + str(get_key(key_name, filename)))
+            print("\nThe key is:\n" + str(get_key(key_name, filename)))
 
         elif user_input == "E":  # Encrypt password
             password = input("What is the password to encrypt?\n")
