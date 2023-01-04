@@ -2,24 +2,20 @@ import random
 import os
 from cryptography.fernet import Fernet
 
-# This script does offer some ways to manage secret keys,
-# its possible to generate & store keys for encryption and decryption,
-# but also to just store the keys for other uses
+# This script offers the option to create, remove, read, list or use keys for encryption / decryption.
 
-# ! I can't guarante for total saveness of the keys, 
-# it's only a "beginner" project! !
+# I can not guarantee for any form of secureness for the keys, it's just a test project.
 
 
-# @return: Secret key
+# @return: Secret key or None if nothing has been found
 def get_key(name: str, filename: str):
     if os.path.exists(filename) and os.stat(filename).st_size != 0 and name.upper() != "X":
         is_found = False
         key = ""
         with open(filename, "r+") as f:
-            lines = f.readlines()
 
             # Check if the key with the given name exists in the file
-            for line in lines:
+            for line in f.readlines():
                 line_split = line.split(":")
                 if line_split[0].lstrip().rstrip() == name:
                     is_found = True
@@ -28,8 +24,7 @@ def get_key(name: str, filename: str):
 
             # If there is no key a new key gets generated with the given name
             if not is_found:
-                key = Fernet.generate_key()
-                f.write(f"{name} : " + key.decode() + "\n")
+                return None
 
     # Generate new key if file is empty or doesn't exist
     else:
@@ -40,12 +35,25 @@ def get_key(name: str, filename: str):
     return key.decode()
 
 
+# Generates a random key and saves it to the file
+def generate_key(name: str, filename: str):
+    with open(filename, "a") as f:
+
+        if get_key(name, filename) is None:
+            key = Fernet.generate_key()
+            f.write(f"{name} : " + key.decode() + "\n")
+
+            print(f"\nGenerated key: {name}")
+        else:
+            print("\nKey does already exist!\nPlease try again with another name!")
+
+
 # @return: Encrypted password
 def encrypt(password: str, key: str):
     fernet = Fernet(key)
     message_encrypted = fernet.encrypt(password.encode())
 
-    return f"\nPassword encrypted\n{message_encrypted.decode()}\n"
+    return f"\nPassword encrypted:\n{message_encrypted.decode()}\n"
 
 
 # @return: Decrypted password
@@ -57,6 +65,8 @@ def decrypt(encrypted_text: str, key: str):
 
 
 # @return: Returns a randomly generated password with desired length
+# TODO: Build a password generator function
+# ! NOT USED ATM !
 def generate_password():
     password = []
     wanted_length = int(input("How long shall your password be?\n"))
@@ -78,15 +88,16 @@ def remove_key(filename: str):
     key_name = input("What is the name of the key?\n")
 
     is_found = False
-    if key_name not in ["X","x"]:
-        with open(filename, "r+") as f:
+    if key_name not in ["X", "x"]:
+        with open(filename, "r") as f:
             lines = f.readlines()
 
             for line in lines:
                 line_split = line.split(":")
+
                 if key_name in line_split[0]:
                     is_found = True
-                    print("Key was successfully removed!")
+                    print("\nKey was successfully removed from the file!")
                     lines.remove(line)
                     break
             with open(filename, "w") as f:
@@ -94,28 +105,28 @@ def remove_key(filename: str):
                     f.write(line)
 
             if not is_found:
-                print("This key doesn't exist!")
+                print("\nThis key could not be found in this file!")
     else:
-        print("Stopped removing..")
+        print("\nStopped removing key..")
 
 
 # Prints the menu of options for the user to choose from.
 # @return: Returns the option the user choose from the menu
 def menu():
     user_input = ""
-    options = ["G", "S", "X", "N", "E", "D", "F", "R"]
+    options = ["G", "S", "X", "N", "E", "D", "F", "R", "C"]
     while user_input not in options:
         print("\n==========( MENU )==========")
         print("F) Select file")
         print("S) Show available keys")
-        print("G) Get key or create new one")
+        print("G) Show key")
         print("R) Remove key")
+        print("C) Create new key")
         print("E) Encrypt password with key")
         print("D) Decrypt password with key")
         print("X) Exit")
         print("============================\n")
         user_input = input("What do you want to do?\n").upper()
-
     return user_input
 
 
@@ -123,10 +134,9 @@ def menu():
 def print_keys(filename: str):
     if os.path.exists(filename) and os.stat(filename).st_size != 0:
         with open(filename, "r") as f:
-            lines = f.readlines()
-            print("\n==========(KEYS)==========")
-            for line in lines:
-                if line != "" and line.find("=(KEYS)=") == -1 :
+            print("==========(KEYS)==========")
+            for line in f.readlines():
+                if line != "" and line.find("========( KEYS )========") == -1 :
                     line_split = line.split(":")
                     print(line_split[0].lstrip().rstrip())
             print("==========================")
@@ -135,56 +145,100 @@ def print_keys(filename: str):
         print("No options available!")
 
 
+# main with everything
 def main():
     is_running = True
     filename = "!"
+    fail_counter = 0  # Counts failed decryption attempts
 
     while is_running:
-        user_input = menu()
 
-        if user_input == "X":  # Exit
+        # Delete file if there are to many failed inputs
+        if fail_counter >= 3:  # Error count resets with restart of script
+            print("\nDeleting key file because of too many failed inputs!")
+            os.remove(filename)
+            print("File succesfully deleted!")
             is_running = False
+            user_input = "X"
+        else:
+            user_input = menu()
 
-        elif user_input == "F":  # Get file name
+        # Exit the script
+        if user_input == "X" and is_running:
+            os.system("cls")
+            is_running = not (user_input == "X" and is_running)
+
+        # Get the filename
+        elif user_input == "F":
+            os.system("cls")
             filename = input("\nWhat is the name of the file?\n")
 
-            print("\nKey file does exist!") if os.path.exists(filename) else \
-                print("\nKey file doesn't exist!\nPlease try again!\n")
+            print("\nFile succesfully selected!") if os.path.exists(filename) else \
+                print("\nThis file could not be found!\n")
 
             if not os.path.exists(filename):
-                if input("Do you want to create this file? (Y)\n").upper() == "Y":
+                if input("\nType (Y) to create this file or abort by typing something else!").upper() == "Y":
                     with open(filename, "w") as f:
-                        f.write("====(KEYS)====\n")
+                        f.write("========( KEYS )========\n")
 
-        elif not os.path.exists(filename) or filename == "!":  # Check if filename is set
+        # Check if a file with the given name does exist
+        elif is_running and not os.path.exists(filename) or filename == "!":
+            os.system("cls")
             print("Please enter a filename!\n")
 
-        elif user_input == "S":  # Shows all names of possible keys
-            print_keys(filename) if os.path.exists(filename) else print("File doesn't exist!")
+        # Prints list of all keys in the file
+        elif user_input == "S":
+            os.system("cls")
+            print_keys(filename) if os.path.exists(filename) else print("\nThis file could not be found!")
 
-        elif user_input == "G":  # Print key with given name
-            print("If you want a new key, just enter a new name!")
-            key_name = input("\nWhat is the key name?\n")
-            print("\nThe key is:\n" + str(get_key(key_name, filename)))
+        # Print key of given name
+        elif user_input == "G":
+            os.system("cls")
 
-        elif user_input == "E":  # Encrypt password
+            key_name = input("What is the name of the key?\n")
+            result_key = get_key(key_name, filename)
+            print("\nThe key is:\n" + result_key) if result_key is None else print("\nThis key doesn't exist!")
+
+        # Encrypt password with key
+        elif user_input == "E":
             password = input("What is the password to encrypt?\n")
             key_name = input("What is the name of the key?\n")
             key = get_key(key_name, filename)
 
-            password_encrypted = encrypt(password, key)
-            print(password_encrypted)
+            if not key is None:
+                password_encrypted = encrypt(password, key)
+                print(password_encrypted)
+            else:
+                print("\nThis key could not be found!")
 
-        elif user_input == "D":  # Decrypt password
+        # Decrypt password with key
+        elif user_input == "D":
+            os.system("cls")
             password_encrypted = input("What is the password to decrypt?\n").encode()
             key_name = input("What is the name of the key?\n")
             key = get_key(key_name, filename)
 
-            password_decrypted = decrypt(password_encrypted, key)
-            print(password_decrypted)
+            if not key is None:
+                password_decrypted = decrypt(password_encrypted, key)
+                print(password_decrypted)
+            else:
+                print("\nThis key could not be found!\nPlease try again with the right key!")
+                fail_counter += 1
+                print(f"FAIL NR: {fail_counter}")
+                if fail_counter == 2:
+                    print("This is your last chance to get it right, or the file gets deleted!")
 
-        elif user_input == "R":  # Remove key from file
+        # Remove a key from the key list
+        elif user_input == "R":
+            os.system("cls")
             remove_key(filename)
 
+        # Create a new key
+        elif user_input == "C":
+            name = input("What is the name of the key?\n")
+            generate_key(name, filename)
 
+
+# Main part of script
 main()
+print("Stopping script..\n")
